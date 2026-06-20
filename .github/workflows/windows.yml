@@ -46,6 +46,7 @@ jobs:
       run: |
         mkdir -p ${{ github.workspace }}/deps
         mkdir -p ${{ github.workspace }}/deps/Qt
+        mkdir -p ${{ github.workspace }}/deps/lua-apclientpp
 
     - name: Download prebuilt vcpkg packages
       working-directory: ${{ github.workspace }}/deps
@@ -67,6 +68,17 @@ jobs:
     - name: Extract archived prebuilt vcpkg packages
       working-directory: ${{ github.workspace }}/deps
       run: 7z x -y -ovcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }} $env:archive
+
+    - name: Download lua-apclientpp
+      working-directory: ${{ github.workspace }}/deps/lua-apclientpp
+      run: >
+        curl --fail --retry 3 -L
+        -o lua51.7z
+        https://github.com/black-sliver/lua-apclientpp/releases/latest/download/lua51.7z
+
+    - name: Extract lua-apclientpp
+      working-directory: ${{ github.workspace }}/deps/lua-apclientpp
+      run: 7z x -y lua51.7z
 
     - name: Cache Qt
       id: qt-cache
@@ -143,6 +155,12 @@ jobs:
         mkdir ${{ github.workspace }}/build/iconengines
         cp plugins/iconengines/qsvgicon.dll ${{ github.workspace }}/build/iconengines
 
+    - name: Copy lua-apclientpp files
+      working-directory: ${{ github.workspace }}/deps/lua-apclientpp/lua51
+      run: |
+        cp lua51-clang64-dynamic/lua-apclientpp.dll ${{ github.workspace }}/build
+        cp lua51-clang64-dynamic/lua-apclientpp-license.txt ${{ github.workspace }}/build
+
     - name: Create symbol server directory structure
       working-directory: ${{ github.workspace }}/build
       run: |
@@ -211,18 +229,18 @@ jobs:
           ${{ github.workspace }}/build/**/*.ninja_log
           ${{ github.workspace }}/build/**/CMakeCache.txt
 
-    - name: Upload to symbol server
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: eu-west-3
-      if: ${{ env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' && inputs.package }}
-      working-directory: ${{ github.workspace }}/SymStore
-      run: |
-        choco uninstall awscli -y
-        choco install awscli -y --version=2.22.35
-        aws --version
-        aws --endpoint-url https://rgw.ctrl-c.liu.se s3 sync --size-only --exclude * --include *.ex_ --include *.dl_ --include *.pd_ . s3://openmw-sym
+    # - name: Upload to symbol server
+    #   env:
+    #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #     AWS_DEFAULT_REGION: eu-west-3
+    #   if: ${{ env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' && inputs.package }}
+    #   working-directory: ${{ github.workspace }}/SymStore
+    #   run: |
+    #     choco uninstall awscli -y
+    #     choco install awscli -y --version=2.22.35
+    #     aws --version
+    #     aws --endpoint-url https://rgw.ctrl-c.liu.se s3 sync --size-only --exclude * --include *.ex_ --include *.dl_ --include *.pd_ . s3://openmw-sym
 
     - name: Add install directory to PATH
       shell: bash
